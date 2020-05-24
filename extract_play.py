@@ -2,14 +2,14 @@ from wand.image import Image
 import matplotlib.pyplot as plt
 
 
-img = Image(filename="assets/tetris_dr_mario_sprites_virus.png")
+img = Image(filename="./assets/tetris_dr_mario_sprites_virus.png")
 
 def make_block():
     pad_left = 0
     pad_top = 40
 
     width = 20
-    height = 20
+    height = 10
 
     offset_x = 40
     offset_y = 25
