@@ -44,7 +44,7 @@ class Window(arcade.Window):
         super().__init__(WIN_X, WIN_Y)
         self.grid = []
         self.grid_previous = []
-        self.grid_sprite_list = arcade.SpriteList()
+        self.grid_sprite_list = None
         self.elapsed_time = 0
         self.elapsed_key_time = 0
         self.elapsed_dropdown_time = 0
@@ -60,6 +60,7 @@ class Window(arcade.Window):
         self.setup()
 
     def setup(self):
+        self.grid_sprite_list = arcade.SpriteList()
         self.grid = [[ITEM_BLANK] * GRID_SIZE_H for i in range(GRID_SIZE_V)]
         self.difficulty = DIFFICULTY_EASY
         self.dropdown_speed = DROPDOWN_SPEED
@@ -80,10 +81,17 @@ class Window(arcade.Window):
         self.reset_grid()
 
         virus_count = self.level * 4
-        positions = [(x, y) for y in range(GRID_SIZE_V - 3) for x in range(GRID_SIZE_H)]
+        positions = [[x, y] for y in range(GRID_SIZE_V - 3) for x in range(GRID_SIZE_H)]
+        weights = [1 / (position[1] + 1) for position in positions]
+        blocks = []
+        for _ in range(virus_count):
+            index = random.choices(range(len(positions)), weights, k=1)[0]
+            virus = random.choice([ITEM_VIRUS_B, ITEM_VIRUS_R, ITEM_VIRUS_Y])
+            blocks.append(positions[index] + [virus])
+            positions.pop(index)
+            weights.pop(index)
+            
 
-        blocks = [(x, y, random.choice([ITEM_VIRUS_B, ITEM_VIRUS_R, ITEM_VIRUS_Y]))
-                  for x, y in random.choices(positions, k=virus_count)]
         for (x, y, virus) in blocks:
             self.grid[y][x] = virus
             sprite_index = y * GRID_SIZE_H + x
@@ -143,13 +151,13 @@ class Window(arcade.Window):
             self.current_bar.debug_matrix()
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.LEFT and self.elapsed_key_time >= self.key_speed:
+        if key == arcade.key.LEFT:
             self.direction = DIRECTION_LEFT
             self.elapsed_key_time = KEY_SPEED
-        elif key == arcade.key.RIGHT and self.elapsed_key_time >= self.key_speed:
+        elif key == arcade.key.RIGHT:
             self.direction = DIRECTION_RIGHT
             self.elapsed_key_time = KEY_SPEED
-        elif key == arcade.key.DOWN and self.elapsed_key_time >= self.key_speed:
+        elif key == arcade.key.DOWN:
             self.direction = DIRECTION_DOWN
             self.elapsed_key_time = KEY_SPEED
         elif key == arcade.key.A:
@@ -160,10 +168,18 @@ class Window(arcade.Window):
         elif key == arcade.key.ESCAPE:
             self.close()
 
+        elif key == arcade.key.R:
+            self.setup()
+
     def on_key_release(self, key, modifiers):
-        if key == arcade.key.LEFT or arcade.key.RIGHT or arcade.key.RIGHT:
+        if key == arcade.key.LEFT and self.direction == DIRECTION_LEFT:
             self.direction = DIRECTION_NEUTRAL
-            self.elapsed_key_time = KEY_SPEED
+
+        if key == arcade.key.RIGHT and self.direction == DIRECTION_RIGHT:
+            self.direction = DIRECTION_NEUTRAL
+
+        if key == arcade.key.DOWN and self.direction == DIRECTION_DOWN:
+            self.direction = DIRECTION_NEUTRAL
 
 
 def main():

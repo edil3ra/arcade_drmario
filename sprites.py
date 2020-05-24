@@ -1,5 +1,6 @@
 import arcade
 import random
+
 from config import (
     ASSETS_VIRUS_BLUE,
     ASSETS_VIRUS_BLUE2,
@@ -7,27 +8,16 @@ from config import (
     ASSETS_VIRUS_YELLOW2,
     ASSETS_VIRUS_RED,
     ASSETS_VIRUS_RED2,
-    ASSETS_BAR_BLUE_BLUE,
-    ASSETS_BAR_RED_BLUE,
-    ASSETS_BAR_YELLOW_BLUE,
-    ASSETS_BAR_BLUE_RED,
-    ASSETS_BAR_RED_RED,
-    ASSETS_BAR_YELLOW_RED,
-    ASSETS_BAR_BLUE_YELLOW,
-    ASSETS_BAR_RED_YELLOW,
-    ASSETS_BAR_YELLOW_YELLOW,
+    ASSETS_BALL_BLUE,
+    ASSETS_BALL_YELLOW,
+    ASSETS_BALL_RED,
+    ITEM_BLANK,
     ITEM_VIRUS_B,
     ITEM_VIRUS_R,
     ITEM_VIRUS_Y,
-    ITEM_BAR_B_B,
-    ITEM_BAR_R_B,
-    ITEM_BAR_Y_B,
-    ITEM_BAR_B_R,
-    ITEM_BAR_R_R,
-    ITEM_BAR_Y_R,
-    ITEM_BAR_B_Y,
-    ITEM_BAR_R_Y,
-    ITEM_BAR_Y_Y,
+    ITEM_BLOCK_B,
+    ITEM_BLOCK_R,
+    ITEM_BLOCK_Y,
     ITEM_SIZE,
     GRID_PAD_LEFT,
     GRID_PAD_BOTTOM,
@@ -42,16 +32,10 @@ from config import (
     ROTATION_RIGHT,
 )
 
-bar_textures = {
-    ITEM_BAR_B_B: arcade.load_texture(ASSETS_BAR_BLUE_BLUE),
-    ITEM_BAR_R_B: arcade.load_texture(ASSETS_BAR_RED_BLUE),
-    ITEM_BAR_Y_B: arcade.load_texture(ASSETS_BAR_YELLOW_BLUE),
-    ITEM_BAR_B_R: arcade.load_texture(ASSETS_BAR_BLUE_RED),
-    ITEM_BAR_R_R: arcade.load_texture(ASSETS_BAR_RED_RED),
-    ITEM_BAR_Y_R: arcade.load_texture(ASSETS_BAR_YELLOW_RED),
-    ITEM_BAR_B_Y: arcade.load_texture(ASSETS_BAR_BLUE_YELLOW),
-    ITEM_BAR_R_Y: arcade.load_texture(ASSETS_BAR_RED_YELLOW),
-    ITEM_BAR_Y_Y: arcade.load_texture(ASSETS_BAR_YELLOW_YELLOW),
+ball_textures = {
+    ITEM_BLOCK_B: ASSETS_BALL_BLUE,
+    ITEM_BLOCK_Y: ASSETS_BALL_YELLOW,
+    ITEM_BLOCK_R: ASSETS_BALL_RED,
 }
 
 
@@ -61,42 +45,36 @@ class SpriteBlank(arcade.SpriteSolidColor):
         super().__init__(20, 20, arcade.color.BLACK_BEAN)
 
 
-class SpriteBar(arcade.Sprite):
+class SpriteBlock(arcade.Sprite):
 
-    def __init__(self, type):
-        self.matrix = [[1, 1], [0, 0]]
-        super().__init__()
-        self.type = type
-        self.setup_filename(type)
+    def __init__(self, block_type):
+        super().__init__(ball_textures[block_type], scale=2)
+        self.type = block_type
+
+
+class SpriteBar():
+
+    def __init__(self, block1, block2):
+        self.block1 = block1
+        self.block2 = block2
         self.grid_position = [GRID_SIZE_H // 2 - 1, GRID_SIZE_V - 1]
+        self.matrix = [[self.block1, self.block2], [0, 0]]
         self.set_position()
 
-    def setup_filename(self, type):
-        self.texture = bar_textures[type]
-        self.scale = 2.3
-
     def set_position(self):
-        x = 0
-        y = 0
-        if self.matrix[0][1] == 1 and self.matrix[1][1] == 1:
-            x = 1
-        if self.matrix[1][0] == 1 and self.matrix[1][1] == 1:
-            y = 1
-
-        self.position = [
-            GRID_PAD_LEFT + (self.grid_position[0] + x) * ITEM_SIZE + 15,
-            GRID_PAD_BOTTOM + (self.grid_position[1] + y) * ITEM_SIZE - 3
-        ]
+        for col in range(2):
+            for row in range(2):
+                item = self.matrix[col][row]
+                if item is self.block1 or item is self.block2:
+                    item.position = (GRID_PAD_LEFT + (self.grid_position[0] + row) * ITEM_SIZE,
+                                     GRID_PAD_BOTTOM + (self.grid_position[1] + col) * ITEM_SIZE)
 
     def rotate(self, direction=ROTATION_LEFT):
         if direction == ROTATION_LEFT:
             self.matrix = [list(r) for r in zip(*self.matrix[::-1])]
         elif direction == ROTATION_RIGHT:
-            self.matrix = [list(r) for r in reversed(zip(*self.matrix))]
+            self.matrix = [list(r) for r in reversed(list(zip(*self.matrix)))]
         self.set_position()
-
-    def update(self, delta_time):
-        pass
 
     def move(self, direction):
         if direction == DIRECTION_DOWN:
@@ -110,22 +88,27 @@ class SpriteBar(arcade.Sprite):
 
         self.set_position()
 
+    def draw(self):
+        self.block1.draw()
+        self.block2.draw()
+
     @classmethod
     def Random(cls):
-        types = [
-            ITEM_BAR_B_B,
-            ITEM_BAR_R_B,
-            ITEM_BAR_Y_B,
-            ITEM_BAR_B_R,
-            ITEM_BAR_R_R,
-            ITEM_BAR_Y_R,
-            ITEM_BAR_B_Y,
-            ITEM_BAR_R_Y,
-            ITEM_BAR_Y_Y,
+        blocks = [
+            (ITEM_BLOCK_R, ITEM_BLOCK_R),
+            (ITEM_BLOCK_R, ITEM_BLOCK_Y),
+            (ITEM_BLOCK_R, ITEM_BLOCK_B),
+            (ITEM_BLOCK_B, ITEM_BLOCK_B),
+            (ITEM_BLOCK_B, ITEM_BLOCK_R),
+            (ITEM_BLOCK_B, ITEM_BLOCK_Y),
+            (ITEM_BLOCK_Y, ITEM_BLOCK_B),
+            (ITEM_BLOCK_Y, ITEM_BLOCK_R),
+            (ITEM_BLOCK_Y, ITEM_BLOCK_Y),
         ]
-        type = random.choice(types)
-        return SpriteBar(type)
-
+        choosen_blocks = random.choice(blocks)
+        block1 = SpriteBlock(choosen_blocks[0])
+        block2 = SpriteBlock(choosen_blocks[1])
+        return SpriteBar(block1, block2)
 
     def debug_matrix(self):
         positions = [(
@@ -135,13 +118,6 @@ class SpriteBar(arcade.Sprite):
 
         for x, y in positions:
             arcade.draw_rectangle_outline(x, y, width=20, height=20, color=arcade.color.GREEN)
-
-
-
-class SpriteBlock(arcade.Sprite):
-
-    def __init__(self, filename):
-        pass
 
 
 class SpriteVirus(arcade.Sprite):
