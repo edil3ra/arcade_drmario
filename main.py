@@ -74,13 +74,13 @@ class Window(arcade.Window):
             for column in range(GRID_SIZE_H):
                 sprite = SpriteBlock(ITEM_BLANK)
                 sprite.position = (column * ITEM_SIZE + GRID_PAD_LEFT,
-                                   row * ITEM_SIZE + GRID_PAD_BOTTOM)
+                                   (GRID_SIZE_V - row - 1) * ITEM_SIZE + GRID_PAD_BOTTOM)
                 self.grid_sprite_list.append(sprite)
 
     def generate_virus(self):
         virus_count = self.level * 4
-        positions = [[x, y] for y in range(GRID_SIZE_V - 3) for x in range(GRID_SIZE_H)]
-        weights = [1 / (position[1] + 1) for position in positions]
+        positions = [[x, y] for y in range(3, GRID_SIZE_V) for x in range(GRID_SIZE_H)]
+        weights = [(position[1] - 3) for position in positions]
         blocks = []
         for _ in range(virus_count):
             index = random.choices(range(len(positions)), weights, k=1)[0]
@@ -97,6 +97,10 @@ class Window(arcade.Window):
     def build_grid(self):
         self.reset_grid()
         self.generate_virus()
+
+    def next_bar(self):
+        self.current_bar = self.bars.pop()
+        self.bars.append(SpriteBar.Random())
 
     def debug_grid(self):
         positions = [(
@@ -153,10 +157,12 @@ class Window(arcade.Window):
                     self.current_bar.set_previous_rotation()
 
             if self.is_bar_collide_with_bottom_boundary():
+                self.current_bar.set_previous_position()
                 for block, x, y in self.current_bar.blocks():
                     self.grid[y][x] = block.type
-                    sprite_index = y * GRID_SIZE_H + x
+                    sprite_index = (y) * (GRID_SIZE_H) + x
                     self.grid_sprite_list[sprite_index].set_type(block.type)
+                    self.next_bar()
 
             self.has_move = False
             self.has_rotate = False
