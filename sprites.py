@@ -3,14 +3,12 @@ import random
 
 from config import (
     ASSETS_VIRUS_BLUE,
-    ASSETS_VIRUS_BLUE2,
     ASSETS_VIRUS_YELLOW,
-    ASSETS_VIRUS_YELLOW2,
     ASSETS_VIRUS_RED,
-    ASSETS_VIRUS_RED2,
     ASSETS_BALL_BLUE,
     ASSETS_BALL_YELLOW,
     ASSETS_BALL_RED,
+    ASSETS_BLACK,
     ITEM_BLANK,
     ITEM_VIRUS_B,
     ITEM_VIRUS_R,
@@ -32,33 +30,45 @@ from config import (
     ROTATION_RIGHT,
 )
 
+
 ball_textures = {
-    ITEM_BLOCK_B: ASSETS_BALL_BLUE,
-    ITEM_BLOCK_Y: ASSETS_BALL_YELLOW,
-    ITEM_BLOCK_R: ASSETS_BALL_RED,
+    ITEM_BLANK:   arcade.load_texture(ASSETS_BLACK),
+    ITEM_BLOCK_B: arcade.load_texture(ASSETS_BALL_BLUE),
+    ITEM_BLOCK_Y: arcade.load_texture(ASSETS_BALL_YELLOW),
+    ITEM_BLOCK_R: arcade.load_texture(ASSETS_BALL_RED),
+    ITEM_VIRUS_B: arcade.load_texture(ASSETS_VIRUS_BLUE),
+    ITEM_VIRUS_Y: arcade.load_texture(ASSETS_VIRUS_YELLOW),
+    ITEM_VIRUS_R: arcade.load_texture(ASSETS_VIRUS_RED),
 }
-
-
-class SpriteBlank(arcade.SpriteSolidColor):
-
-    def __init__(self):
-        super().__init__(20, 20, arcade.color.BLACK_BEAN)
 
 
 class SpriteBlock(arcade.Sprite):
 
-    def __init__(self, block_type):
-        super().__init__(ball_textures[block_type], scale=2)
-        self.type = block_type
+    def __init__(self, block_type, scale=2):
+        super().__init__(scale=scale)
+        self.index = (0, 0)
+        self.set_type(block_type)
 
+    def set_type(self, block_type):
+        self.type = block_type
+        self.texture = ball_textures[self.type]
 
 class SpriteBar():
 
     def __init__(self, block1, block2):
         self.block1 = block1
         self.block2 = block2
+        self.grid_position = [0, 0]
+        self.matrix = [[0, 0], [0, 0]]
+        self.previous_matrix = [0, 0]
+        self.previous_grid_position = [0, 0]
+        self.setup()
+
+    def setup(self):
         self.grid_position = [GRID_SIZE_H // 2 - 1, GRID_SIZE_V - 1]
         self.matrix = [[self.block1, self.block2], [0, 0]]
+        self.previous_grid_position = self.grid_position
+        self.previous_matrix = self.matrix
         self.set_position()
 
     def set_position(self):
@@ -66,31 +76,54 @@ class SpriteBar():
             for row in range(2):
                 item = self.matrix[col][row]
                 if item is self.block1 or item is self.block2:
+                    item.index = (row, col)
                     item.position = (GRID_PAD_LEFT + (self.grid_position[0] + row) * ITEM_SIZE,
                                      GRID_PAD_BOTTOM + (self.grid_position[1] + col) * ITEM_SIZE)
 
-    def rotate(self, direction=ROTATION_LEFT):
-        if direction == ROTATION_LEFT:
+    def move(self, direction):
+        self.previous_grid_position = self.grid_position[::]
+        if direction == DIRECTION_DOWN:
+            self.grid_position[1] -= 1
+        elif direction == DIRECTION_LEFT:
+            self.grid_position[0] -= 1
+        elif direction == DIRECTION_RIGHT:
+            self.grid_position[0] += 1
+        self.set_position()
+
+    def rotate(self, rotation=ROTATION_LEFT):
+        self.previous_matrix = self.matrix[::]
+        if rotation == ROTATION_LEFT:
             self.matrix = [list(r) for r in zip(*self.matrix[::-1])]
-        elif direction == ROTATION_RIGHT:
+        elif rotation == ROTATION_RIGHT:
             self.matrix = [list(r) for r in reversed(list(zip(*self.matrix)))]
         self.set_position()
 
-    def move(self, direction):
-        if direction == DIRECTION_DOWN:
-            self.grid_position[1] -= 1
+    def set_previous_rotation(self):
+        self.matrix = self.previous_matrix
+        self.set_position()
 
-        elif direction == DIRECTION_LEFT:
-            self.grid_position[0] -= 1
-
-        elif direction == DIRECTION_RIGHT:
-            self.grid_position[0] += 1
-
+    def set_previous_position(self):
+        self.grid_position = self.previous_grid_position
         self.set_position()
 
     def draw(self):
         self.block1.draw()
         self.block2.draw()
+
+    def blocks(self):
+        "Get blocks and grid positions"
+        return (
+            [
+                self.block1,
+                self.block1.index[0] + self.grid_position[0],
+                self.block1.index[1] + self.grid_position[1],
+            ],
+            [
+                self.block2,
+                self.block2.index[0] + self.grid_position[0],
+                self.block2.index[1] + self.grid_position[1],
+            ],
+        )
 
     @classmethod
     def Random(cls):
@@ -118,30 +151,3 @@ class SpriteBar():
 
         for x, y in positions:
             arcade.draw_rectangle_outline(x, y, width=20, height=20, color=arcade.color.GREEN)
-
-
-class SpriteVirus(arcade.Sprite):
-
-    def __init__(self, image1, image2):
-        self.image1 = image1
-        self.image2 = image2
-        self.type = None
-        super().__init__(image1, 2)
-
-    @classmethod
-    def create_blue_virus(cls,):
-        virus = cls(ASSETS_VIRUS_BLUE, ASSETS_VIRUS_BLUE2)
-        virus.type = ITEM_VIRUS_B
-        return virus
-
-    @classmethod
-    def create_red_virus(cls,):
-        virus = cls(ASSETS_VIRUS_RED, ASSETS_VIRUS_RED2)
-        virus.type = ITEM_VIRUS_R
-        return virus
-
-    @classmethod
-    def create_yellow_virus(cls,):
-        virus = cls(ASSETS_VIRUS_YELLOW, ASSETS_VIRUS_YELLOW2)
-        virus.type = ITEM_VIRUS_R
-        return virus

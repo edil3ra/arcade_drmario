@@ -1,15 +1,7 @@
 SCREEN_TITLE = "Dr mario"
 ASSETS_FOLDER = './assets'
-ASSETS_BAR_BLUE_BLUE = f'{ASSETS_FOLDER}/block_y0_x0.jpg'
-ASSETS_BAR_RED_BLUE = f'{ASSETS_FOLDER}/block_y0_x1.jpg'
-ASSETS_BAR_YELLOW_BLUE = f'{ASSETS_FOLDER}/block_y0_x2.jpg'
-ASSETS_BAR_BLUE_RED = f'{ASSETS_FOLDER}/block_y1_x0.jpg'
-ASSETS_BAR_RED_RED = f'{ASSETS_FOLDER}/block_y1_x1.jpg'
-ASSETS_BAR_YELLOW_RED = f'{ASSETS_FOLDER}/block_y1_x2.jpg'
-ASSETS_BAR_BLUE_YELLOW = f'{ASSETS_FOLDER}/block_y2_x0.jpg'
-ASSETS_BAR_RED_YELLOW = f'{ASSETS_FOLDER}/block_y2_x1.jpg'
-ASSETS_BAR_YELLOW_YELLOW = f'{ASSETS_FOLDER}/block_y2_x2.jpg'
 
+ASSETS_BLACK = f'{ASSETS_FOLDER}/black_sprite.jpg'
 ASSETS_BALL_BLUE = f'{ASSETS_FOLDER}/single_ball_tetris_smile_blue.png'
 ASSETS_BALL_YELLOW = f'{ASSETS_FOLDER}/single_ball_tetris_smile_yellow.png'
 ASSETS_BALL_RED = f'{ASSETS_FOLDER}/single_ball_tetris_smile_red.png'

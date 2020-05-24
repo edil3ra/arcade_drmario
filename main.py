@@ -2,7 +2,6 @@ import random
 
 import arcade
 from config import (
-    ASSETS_BAR_BLUE_BLUE,
     ASSETS_BALL_BLUE,
     ASSETS_BALL_RED,
     ASSETS_BALL_YELLOW,
@@ -32,8 +31,7 @@ from config import (
 )
 
 from sprites import (
-    SpriteVirus,
-    SpriteBlank,
+    SpriteBlock,
     SpriteBar,
 )
 
@@ -56,6 +54,8 @@ class Window(arcade.Window):
         self.current_bar = None
         self.direction = DIRECTION_NEUTRAL
         self.rotation = ROTATION_NEUTRAL
+        self.has_move = False
+        self.has_rotate = False
         self.debug = True
         self.setup()
 
@@ -64,7 +64,7 @@ class Window(arcade.Window):
         self.grid = [[ITEM_BLANK] * GRID_SIZE_H for i in range(GRID_SIZE_V)]
         self.difficulty = DIFFICULTY_EASY
         self.dropdown_speed = DROPDOWN_SPEED
-        self.level = 20
+        self.level = 10
         self.bars = [SpriteBar.Random(), SpriteBar.Random(), SpriteBar.Random()]
         self.current_bar = SpriteBar.Random()
         self.build_grid()
@@ -72,14 +72,12 @@ class Window(arcade.Window):
     def reset_grid(self):
         for row in range(GRID_SIZE_V):
             for column in range(GRID_SIZE_H):
-                sprite = SpriteBlank()
+                sprite = SpriteBlock(ITEM_BLANK)
                 sprite.position = (column * ITEM_SIZE + GRID_PAD_LEFT,
                                    row * ITEM_SIZE + GRID_PAD_BOTTOM)
                 self.grid_sprite_list.append(sprite)
 
-    def build_grid(self):
-        self.reset_grid()
-
+    def generate_virus(self):
         virus_count = self.level * 4
         positions = [[x, y] for y in range(GRID_SIZE_V - 3) for x in range(GRID_SIZE_H)]
         weights = [1 / (position[1] + 1) for position in positions]
@@ -90,21 +88,15 @@ class Window(arcade.Window):
             blocks.append(positions[index] + [virus])
             positions.pop(index)
             weights.pop(index)
-            
 
         for (x, y, virus) in blocks:
             self.grid[y][x] = virus
             sprite_index = y * GRID_SIZE_H + x
-            new_sprite = (
-                0,
-                SpriteVirus.create_blue_virus,
-                SpriteVirus.create_red_virus,
-                SpriteVirus.create_yellow_virus,
-            )[virus]()
-            new_sprite.position = (x * ITEM_SIZE + GRID_PAD_LEFT, y * ITEM_SIZE + GRID_PAD_BOTTOM)
-            old_sprite = self.grid_sprite_list[sprite_index]
-            self.grid_sprite_list.remove(old_sprite)
-            self.grid_sprite_list.insert(sprite_index, new_sprite)
+            self.grid_sprite_list[sprite_index].set_type(virus)
+
+    def build_grid(self):
+        self.reset_grid()
+        self.generate_virus()
 
     def debug_grid(self):
         positions = [(
@@ -119,6 +111,18 @@ class Window(arcade.Window):
         self.current_bar = self.bars.pop()
         self.bars.append(SpriteBar.Random())
 
+    def is_bar_collide_with_left_right_boundary(self):
+        for _, x, _ in self.current_bar.blocks():
+            if x < 0 or x >= GRID_SIZE_H:
+                return True
+        return False
+
+    def is_bar_collide_with_bottom_boundary(self):
+        for _, _, y in self.current_bar.blocks():
+            if y < 0:
+                return True
+        return False
+
     def on_update(self, delta_time):
         if self.elapsed_time >= self.game_speed:
             self.elapsed_time -= self.game_speed
@@ -127,16 +131,35 @@ class Window(arcade.Window):
             if self.direction is not DIRECTION_NEUTRAL and self.elapsed_key_time > self.key_speed:
                 self.current_bar.move(self.direction)
                 self.elapsed_key_time = 0
+                self.has_move = True
 
             # ROTATE THE BAR
             if self.rotation is not ROTATION_NEUTRAL:
                 self.current_bar.rotate(self.rotation)
                 self.rotation = ROTATION_NEUTRAL
+                self.has_rotate = True
 
             # MOVE THE BAR AUTOMATICLY
             if self.elapsed_dropdown_time > self.dropdown_speed:
                 self.current_bar.move(DIRECTION_DOWN)
                 self.elapsed_dropdown_time = 0
+                self.has_move = True
+
+            # BOUNDARY COLLISION
+            if self.is_bar_collide_with_left_right_boundary():
+                if self.has_move:
+                    self.current_bar.set_previous_position()
+                if self.has_rotate:
+                    self.current_bar.set_previous_rotation()
+
+            if self.is_bar_collide_with_bottom_boundary():
+                for block, x, y in self.current_bar.blocks():
+                    self.grid[y][x] = block.type
+                    sprite_index = y * GRID_SIZE_H + x
+                    self.grid_sprite_list[sprite_index].set_type(block.type)
+
+            self.has_move = False
+            self.has_rotate = False
 
         self.elapsed_time += delta_time
         self.elapsed_key_time += delta_time
