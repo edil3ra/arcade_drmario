@@ -21,18 +21,15 @@ from config import (
     GRID_PAD_BOTTOM,
     GRID_SIZE_V,
     GRID_SIZE_H,
-    DIRECTION_NEUTRAL,
     DIRECTION_DOWN,
     DIRECTION_LEFT,
     DIRECTION_RIGHT,
-    ROTATION_NEUTRAL,
     ROTATION_LEFT,
     ROTATION_RIGHT,
 )
 
-
 ball_textures = {
-    ITEM_BLANK:   arcade.load_texture(ASSETS_BLACK),
+    ITEM_BLANK: arcade.load_texture(ASSETS_BLACK),
     ITEM_BLOCK_B: arcade.load_texture(ASSETS_BALL_BLUE),
     ITEM_BLOCK_Y: arcade.load_texture(ASSETS_BALL_YELLOW),
     ITEM_BLOCK_R: arcade.load_texture(ASSETS_BALL_RED),
@@ -52,6 +49,7 @@ class SpriteBlock(arcade.Sprite):
     def set_type(self, block_type):
         self.type = block_type
         self.texture = ball_textures[self.type]
+
 
 class SpriteBar():
 

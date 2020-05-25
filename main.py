@@ -1,5 +1,5 @@
 import random
-
+from copy import deepcopy
 import arcade
 from config import (
     ASSETS_BALL_BLUE,
@@ -10,6 +10,12 @@ from config import (
     GRID_SIZE_H,
     GRID_SIZE_V,
     ITEM_BLANK,
+    ITEM_BLOCK_B,
+    ITEM_BLOCK_R,
+    ITEM_BLOCK_Y,
+    ITEM_VIRUS_B,
+    ITEM_VIRUS_R,
+    ITEM_VIRUS_Y,
     ITEM_SIZE,
     DIFFICULTY_EASY,
     KEY_SPEED,
@@ -18,9 +24,6 @@ from config import (
     GRID_PAD_LEFT,
     GRID_PAD_BOTTOM,
     LEVEL_MAX,
-    ITEM_VIRUS_B,
-    ITEM_VIRUS_R,
-    ITEM_VIRUS_Y,
     DIRECTION_NEUTRAL,
     DIRECTION_LEFT,
     DIRECTION_RIGHT,
@@ -41,7 +44,7 @@ class Window(arcade.Window):
     def __init__(self):
         super().__init__(WIN_X, WIN_Y)
         self.grid = []
-        self.grid_previous = []
+        self.previous_grid = []
         self.grid_sprite_list = None
         self.elapsed_time = 0
         self.elapsed_key_time = 0
@@ -64,7 +67,7 @@ class Window(arcade.Window):
         self.grid = [[ITEM_BLANK] * GRID_SIZE_H for i in range(GRID_SIZE_V)]
         self.difficulty = DIFFICULTY_EASY
         self.dropdown_speed = DROPDOWN_SPEED
-        self.level = 10
+        self.level = 1
         self.bars = [SpriteBar.Random(), SpriteBar.Random(), SpriteBar.Random()]
         self.current_bar = SpriteBar.Random()
         self.build_grid()
@@ -74,13 +77,25 @@ class Window(arcade.Window):
             for column in range(GRID_SIZE_H):
                 sprite = SpriteBlock(ITEM_BLANK)
                 sprite.position = (column * ITEM_SIZE + GRID_PAD_LEFT,
-                                   (GRID_SIZE_V - row - 1) * ITEM_SIZE + GRID_PAD_BOTTOM)
+                                   row * ITEM_SIZE + GRID_PAD_BOTTOM)
                 self.grid_sprite_list.append(sprite)
+        self.previous_grid = self.grid[::]
+
+    def update_grid(self):
+        for row in range(GRID_SIZE_V):
+            for column in range(GRID_SIZE_H):
+                previous_item = self.previous_grid[row][column]
+                current_item = self.grid[row][column]
+                if previous_item != current_item:
+                    # import pdb; pdb.set_trace()
+                    sprite_index = (row) * (GRID_SIZE_H) + column
+                    self.grid_sprite_list[sprite_index].set_type(current_item)
+        self.previous_grid = deepcopy(self.grid)
 
     def generate_virus(self):
         virus_count = self.level * 4
-        positions = [[x, y] for y in range(3, GRID_SIZE_V) for x in range(GRID_SIZE_H)]
-        weights = [(position[1] - 3) for position in positions]
+        positions = [[x, y] for y in range(GRID_SIZE_V - 3) for x in range(GRID_SIZE_H)]
+        weights = [(1 / (position[1] + 1)) for position in positions]
         blocks = []
         for _ in range(virus_count):
             index = random.choices(range(len(positions)), weights, k=1)[0]
@@ -127,6 +142,27 @@ class Window(arcade.Window):
                 return True
         return False
 
+    def is_bar_collide_with_blocks(self):
+        for _, x, y in self.current_bar.blocks():
+            if self.grid[y][x] is not ITEM_BLANK:
+                return True
+        return False
+
+    def is_virus(self, item):
+        return item is ITEM_VIRUS_B or item is ITEM_VIRUS_R or item is ITEM_VIRUS_Y
+
+    def is_block(self, item):
+        return item is ITEM_BLOCK_B or item is ITEM_BLOCK_R or item is ITEM_BLOCK_Y
+
+    def is_red(self, item):
+        return item is ITEM_BLOCK_R or item is ITEM_VIRUS_R
+
+    def is_blue(self, item):
+        return item is ITEM_BLOCK_B or item is ITEM_VIRUS_B
+
+    def is_yellow(self, item):
+        return item is ITEM_BLOCK_Y or item is ITEM_VIRUS_Y
+
     def on_update(self, delta_time):
         if self.elapsed_time >= self.game_speed:
             self.elapsed_time -= self.game_speed
@@ -149,6 +185,11 @@ class Window(arcade.Window):
                 self.elapsed_dropdown_time = 0
                 self.has_move = True
 
+
+            has_collide_left_and_right = self.is_bar_collide_with_left_right_boundary()
+            has_collide_with_bottom_boundary = self.is_bar_collide_with_bottom_boundary()
+            has_collide_with_blocks = self.is_bar_collide_with_blocks()
+
             # BOUNDARY COLLISION
             if self.is_bar_collide_with_left_right_boundary():
                 if self.has_move:
@@ -156,14 +197,40 @@ class Window(arcade.Window):
                 if self.has_rotate:
                     self.current_bar.set_previous_rotation()
 
-            if self.is_bar_collide_with_bottom_boundary():
-                self.current_bar.set_previous_position()
+            # BLOCK COLLISION AND BOTTOM COLLISION
+            has_collide_with_other_blocks = self.is_bar_collide_with_blocks()
+            if self.is_bar_collide_with_bottom_boundary() or has_collide_with_other_blocks:
+                if self.has_move:
+                    self.current_bar.set_previous_position()
+                if self.has_rotate:
+                    self.current_bar.set_previous_rotation()
+
                 for block, x, y in self.current_bar.blocks():
                     self.grid[y][x] = block.type
-                    sprite_index = (y) * (GRID_SIZE_H) + x
-                    self.grid_sprite_list[sprite_index].set_type(block.type)
                     self.next_bar()
 
+                # CHECK IF THE GAME NEED TO CLEAR VIRUS OR BLOCK
+                # HORIZONTAL
+                for y in range(GRID_SIZE_V):
+                    for x in range(GRID_SIZE_H - 3):
+                        blocks = self.grid[y][x:x + 3]
+                        all_red = all([self.is_red(block) for block in blocks])
+                        all_yellow = all([self.is_yellow(block) for block in blocks])
+                        all_blue = all([self.is_blue(block) for block in blocks])
+                        if all_red or all_yellow or all_blue:
+                            is_checked = False
+                            if x + 3 <= GRID_SIZE_H:
+                                item = self.grid[y][x + 3]
+                                if (all_red and self.is_red(item)) or\
+                                   (all_blue and self.is_blue(item)) or\
+                                   (all_yellow and self.is_yellow(item)):
+                                    self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
+                                    is_checked = True
+                            if not is_checked:
+                                self.grid[y][x:x + 3] = [ITEM_BLANK] * 3
+                                
+
+            self.update_grid()
             self.has_move = False
             self.has_rotate = False
 
