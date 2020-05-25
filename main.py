@@ -144,8 +144,9 @@ class Window(arcade.Window):
 
     def is_bar_collide_with_blocks(self):
         for _, x, y in self.current_bar.blocks():
-            if self.grid[y][x] is not ITEM_BLANK:
-                return True
+            if x < GRID_SIZE_H:
+                if self.grid[y][x] is not ITEM_BLANK:
+                    return True
         return False
 
     def is_virus(self, item):
@@ -162,6 +163,46 @@ class Window(arcade.Window):
 
     def is_yellow(self, item):
         return item is ITEM_BLOCK_Y or item is ITEM_VIRUS_Y
+
+    def handle_clear_horizontal(self):
+        for y in range(GRID_SIZE_V):
+            for x in range(GRID_SIZE_H - 3):
+                blocks = self.grid[y][x:x + 3]
+                all_red = all([self.is_red(block) for block in blocks])
+                all_yellow = all([self.is_yellow(block) for block in blocks])
+                all_blue = all([self.is_blue(block) for block in blocks])
+                if all_red or all_yellow or all_blue:
+                    is_checked = False
+                    if x + 3 <= GRID_SIZE_H:
+                        item = self.grid[y][x + 3]
+                        if (all_red and self.is_red(item)) or\
+                           (all_blue and self.is_blue(item)) or\
+                           (all_yellow and self.is_yellow(item)):
+                            self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
+                            is_checked = True
+                    if not is_checked:
+                        self.grid[y][x:x + 3] = [ITEM_BLANK] * 3
+
+    def handle_clear_vertical(self):
+        for y in range(GRID_SIZE_V - 3):
+            for x in range(GRID_SIZE_H):
+                blocks = [row[x] for row in self.grid[y:y + 3]]
+                all_red = all([self.is_red(block) for block in blocks])
+                all_yellow = all([self.is_yellow(block) for block in blocks])
+                all_blue = all([self.is_blue(block) for block in blocks])
+                if all_red or all_yellow or all_blue:
+                    is_checked = False
+                    if y + 3 <= GRID_SIZE_V:
+                        item = self.grid[y + 3][x]
+                        if (all_red and self.is_red(item)) or\
+                           (all_blue and self.is_blue(item)) or\
+                           (all_yellow and self.is_yellow(item)):
+                            for i in range(4):
+                                self.grid[y + i][x] = ITEM_BLANK
+                            is_checked = True
+                    if not is_checked:
+                        for i in range(3):
+                            self.grid[y + i][x] = ITEM_BLANK
 
     def on_update(self, delta_time):
         if self.elapsed_time >= self.game_speed:
@@ -185,50 +226,28 @@ class Window(arcade.Window):
                 self.elapsed_dropdown_time = 0
                 self.has_move = True
 
-
-            has_collide_left_and_right = self.is_bar_collide_with_left_right_boundary()
+            has_collide_left_and_right_boundary = self.is_bar_collide_with_left_right_boundary()
             has_collide_with_bottom_boundary = self.is_bar_collide_with_bottom_boundary()
             has_collide_with_blocks = self.is_bar_collide_with_blocks()
+            from_horizontal = self.direction == DIRECTION_LEFT or self.direction == DIRECTION_RIGHT
 
-            # BOUNDARY COLLISION
-            if self.is_bar_collide_with_left_right_boundary():
+            if any([
+                    has_collide_left_and_right_boundary, has_collide_with_bottom_boundary,
+                    has_collide_with_blocks
+            ]):
                 if self.has_move:
                     self.current_bar.set_previous_position()
                 if self.has_rotate:
                     self.current_bar.set_previous_rotation()
 
-            # BLOCK COLLISION AND BOTTOM COLLISION
-            has_collide_with_other_blocks = self.is_bar_collide_with_blocks()
-            if self.is_bar_collide_with_bottom_boundary() or has_collide_with_other_blocks:
-                if self.has_move:
-                    self.current_bar.set_previous_position()
-                if self.has_rotate:
-                    self.current_bar.set_previous_rotation()
-
+            if any([has_collide_with_bottom_boundary, has_collide_with_blocks
+                   ]) and not has_collide_left_and_right_boundary and not from_horizontal:
                 for block, x, y in self.current_bar.blocks():
                     self.grid[y][x] = block.type
                     self.next_bar()
 
-                # CHECK IF THE GAME NEED TO CLEAR VIRUS OR BLOCK
-                # HORIZONTAL
-                for y in range(GRID_SIZE_V):
-                    for x in range(GRID_SIZE_H - 3):
-                        blocks = self.grid[y][x:x + 3]
-                        all_red = all([self.is_red(block) for block in blocks])
-                        all_yellow = all([self.is_yellow(block) for block in blocks])
-                        all_blue = all([self.is_blue(block) for block in blocks])
-                        if all_red or all_yellow or all_blue:
-                            is_checked = False
-                            if x + 3 <= GRID_SIZE_H:
-                                item = self.grid[y][x + 3]
-                                if (all_red and self.is_red(item)) or\
-                                   (all_blue and self.is_blue(item)) or\
-                                   (all_yellow and self.is_yellow(item)):
-                                    self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
-                                    is_checked = True
-                            if not is_checked:
-                                self.grid[y][x:x + 3] = [ITEM_BLANK] * 3
-                                
+                self.handle_clear_horizontal()
+                self.handle_clear_vertical()
 
             self.update_grid()
             self.has_move = False
