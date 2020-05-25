@@ -144,7 +144,7 @@ class Window(arcade.Window):
 
     def is_bar_collide_with_blocks(self):
         for _, x, y in self.current_bar.blocks():
-            if x < GRID_SIZE_H:
+            if x < GRID_SIZE_H and y < GRID_SIZE_V:
                 if self.grid[y][x] is not ITEM_BLANK:
                     return True
         return False
@@ -166,47 +166,53 @@ class Window(arcade.Window):
 
     def handle_clear_horizontal(self):
         for y in range(GRID_SIZE_V):
-            for x in range(GRID_SIZE_H - 3):
-                blocks = self.grid[y][x:x + 3]
+            for x in range(GRID_SIZE_H - 4):
+                blocks = self.grid[y][x:x + 4]
                 all_red = all([self.is_red(block) for block in blocks])
                 all_yellow = all([self.is_yellow(block) for block in blocks])
                 all_blue = all([self.is_blue(block) for block in blocks])
                 if all_red or all_yellow or all_blue:
                     is_checked = False
-                    if x + 3 <= GRID_SIZE_H:
-                        item = self.grid[y][x + 3]
+                    if x + 4 <= GRID_SIZE_H:
+                        item = self.grid[y][x + 4]
                         if (all_red and self.is_red(item)) or\
                            (all_blue and self.is_blue(item)) or\
                            (all_yellow and self.is_yellow(item)):
-                            self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
+                            self.grid[y][x:x + 5] = [ITEM_BLANK] * 5
                             is_checked = True
                     if not is_checked:
-                        self.grid[y][x:x + 3] = [ITEM_BLANK] * 3
+                        self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
 
     def handle_clear_vertical(self):
-        for y in range(GRID_SIZE_V - 3):
+        for y in range(GRID_SIZE_V - 4):
             for x in range(GRID_SIZE_H):
-                blocks = [row[x] for row in self.grid[y:y + 3]]
+                blocks = [row[x] for row in self.grid[y:y + 4]]
                 all_red = all([self.is_red(block) for block in blocks])
                 all_yellow = all([self.is_yellow(block) for block in blocks])
                 all_blue = all([self.is_blue(block) for block in blocks])
                 if all_red or all_yellow or all_blue:
                     is_checked = False
-                    if y + 3 <= GRID_SIZE_V:
-                        item = self.grid[y + 3][x]
+                    if y + 4 <= GRID_SIZE_V:
+                        item = self.grid[y + 4][x]
                         if (all_red and self.is_red(item)) or\
                            (all_blue and self.is_blue(item)) or\
                            (all_yellow and self.is_yellow(item)):
-                            for i in range(4):
+                            for i in range(5):
                                 self.grid[y + i][x] = ITEM_BLANK
                             is_checked = True
                     if not is_checked:
-                        for i in range(3):
+                        for i in range(4):
                             self.grid[y + i][x] = ITEM_BLANK
 
     def on_update(self, delta_time):
         if self.elapsed_time >= self.game_speed:
             self.elapsed_time -= self.game_speed
+
+            # MOVE THE BAR AUTOMATICLY
+            if self.elapsed_dropdown_time > self.dropdown_speed and self.direction is not DIRECTION_DOWN:
+                self.current_bar.move(DIRECTION_DOWN)
+                self.elapsed_dropdown_time = 0
+                self.has_move = True
 
             # MOVE THE BAR ON INPUT
             if self.direction is not DIRECTION_NEUTRAL and self.elapsed_key_time > self.key_speed:
@@ -219,12 +225,6 @@ class Window(arcade.Window):
                 self.current_bar.rotate(self.rotation)
                 self.rotation = ROTATION_NEUTRAL
                 self.has_rotate = True
-
-            # MOVE THE BAR AUTOMATICLY
-            if self.elapsed_dropdown_time > self.dropdown_speed:
-                self.current_bar.move(DIRECTION_DOWN)
-                self.elapsed_dropdown_time = 0
-                self.has_move = True
 
             has_collide_left_and_right_boundary = self.is_bar_collide_with_left_right_boundary()
             has_collide_with_bottom_boundary = self.is_bar_collide_with_bottom_boundary()
@@ -244,14 +244,14 @@ class Window(arcade.Window):
                    ]) and not has_collide_left_and_right_boundary and not from_horizontal:
                 for block, x, y in self.current_bar.blocks():
                     self.grid[y][x] = block.type
-                    self.next_bar()
 
+                self.next_bar()
                 self.handle_clear_horizontal()
                 self.handle_clear_vertical()
 
-            self.update_grid()
             self.has_move = False
             self.has_rotate = False
+            self.update_grid()
 
         self.elapsed_time += delta_time
         self.elapsed_key_time += delta_time
