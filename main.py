@@ -31,12 +31,15 @@ from config import (
     ROTATION_NEUTRAL,
     ROTATION_LEFT,
     ROTATION_RIGHT,
+    VERTICAL_ORIENTATION,
+    HORIZONTAL_ORIENTATION
 )
 
 from sprites import (
     SpriteBlock,
     SpriteBar,
 )
+from utils import vertical_tree_blocks, horizontal_tree_blocks
 
 
 class Window(arcade.Window):
@@ -55,11 +58,17 @@ class Window(arcade.Window):
         self.level = 0
         self.bars = None
         self.current_bar = None
+        self.previeus_bar = None
         self.direction = DIRECTION_NEUTRAL
         self.rotation = ROTATION_NEUTRAL
         self.has_move = False
         self.has_rotate = False
         self.debug = True
+        self.is_playing = True
+        self.clear_vertical = False
+        self.clear_horizontal = False
+        self.blocks_to_drop = []
+        self.blocks_cleared = []
         self.setup()
 
     def setup(self):
@@ -87,7 +96,6 @@ class Window(arcade.Window):
                 previous_item = self.previous_grid[row][column]
                 current_item = self.grid[row][column]
                 if previous_item != current_item:
-                    # import pdb; pdb.set_trace()
                     sprite_index = (row) * (GRID_SIZE_H) + column
                     self.grid_sprite_list[sprite_index].set_type(current_item)
         self.previous_grid = deepcopy(self.grid)
@@ -113,10 +121,6 @@ class Window(arcade.Window):
         self.reset_grid()
         self.generate_virus()
 
-    def next_bar(self):
-        self.current_bar = self.bars.pop()
-        self.bars.append(SpriteBar.Random())
-
     def debug_grid(self):
         positions = [(
             GRID_PAD_LEFT + (i * ITEM_SIZE),
@@ -127,6 +131,7 @@ class Window(arcade.Window):
             arcade.draw_rectangle_outline(x, y, width=20, height=20, color=arcade.color.ORANGE)
 
     def next_bar(self):
+        self.previous_bar = self.current_bar
         self.current_bar = self.bars.pop()
         self.bars.append(SpriteBar.Random())
 
@@ -165,6 +170,7 @@ class Window(arcade.Window):
         return item is ITEM_BLOCK_Y or item is ITEM_VIRUS_Y
 
     def handle_clear_horizontal(self):
+        self.clear_horizontal = False
         for y in range(GRID_SIZE_V):
             for x in range(GRID_SIZE_H - 4):
                 blocks = self.grid[y][x:x + 4]
@@ -173,17 +179,22 @@ class Window(arcade.Window):
                 all_blue = all([self.is_blue(block) for block in blocks])
                 if all_red or all_yellow or all_blue:
                     is_checked = False
+                    self.clear_horizontal = True
                     if x + 4 <= GRID_SIZE_H:
                         item = self.grid[y][x + 4]
                         if (all_red and self.is_red(item)) or\
                            (all_blue and self.is_blue(item)) or\
                            (all_yellow and self.is_yellow(item)):
                             self.grid[y][x:x + 5] = [ITEM_BLANK] * 5
+                            self.blocks_cleared.append([(y, x + i) for i in range(5)])
                             is_checked = True
                     if not is_checked:
+                        self.blocks_cleared.append([(y, x + i) for i in range(4)])
                         self.grid[y][x:x + 4] = [ITEM_BLANK] * 4
 
+
     def handle_clear_vertical(self):
+        self.clear_vertical = False
         for y in range(GRID_SIZE_V - 4):
             for x in range(GRID_SIZE_H):
                 blocks = [row[x] for row in self.grid[y:y + 4]]
@@ -192,65 +203,110 @@ class Window(arcade.Window):
                 all_blue = all([self.is_blue(block) for block in blocks])
                 if all_red or all_yellow or all_blue:
                     is_checked = False
+                    self.clear_vertical = True
                     if y + 4 <= GRID_SIZE_V:
                         item = self.grid[y + 4][x]
                         if (all_red and self.is_red(item)) or\
                            (all_blue and self.is_blue(item)) or\
                            (all_yellow and self.is_yellow(item)):
+                            self.blocks_cleared.append([(y + i, x) for i in range(5)])
                             for i in range(5):
                                 self.grid[y + i][x] = ITEM_BLANK
                             is_checked = True
                     if not is_checked:
+                        self.blocks_cleared.append([(y + i, x) for i in range(4)])
                         for i in range(4):
                             self.grid[y + i][x] = ITEM_BLANK
 
+
+    def get_blocks_in_air(self):
+        # if len(self.blocks_cleared) > 0:
+        #     print(self.blocks_cleared)
+
+        self.blocks_cleared.clear()
+        return []
+
+    def handle_movement(self):
+        # MOVE THE BAR AUTOMATICLY
+        if self.elapsed_dropdown_time > self.dropdown_speed and self.direction is not DIRECTION_DOWN:
+            self.current_bar.move(DIRECTION_DOWN)
+            self.elapsed_dropdown_time = 0
+            self.has_move = True
+
+        # MOVE THE BAR ON INPUT
+        if self.direction is not DIRECTION_NEUTRAL and self.elapsed_key_time > self.key_speed:
+            self.current_bar.move(self.direction)
+            self.elapsed_key_time = 0
+            self.has_move = True
+
+        # ROTATE THE BAR
+        if self.rotation is not ROTATION_NEUTRAL:
+            self.current_bar.rotate(self.rotation)
+            self.rotation = ROTATION_NEUTRAL
+            self.has_rotate = True
+
+    def handle_reverse_movement(self):
+        if self.has_move:
+            self.current_bar.set_previous_position()
+        if self.has_rotate:
+            self.current_bar.set_previous_rotation()
+
+    def handle_placing_bar(self):
+        for block, x, y in self.current_bar.blocks():
+            self.grid[y][x] = block.type
+
+        self.next_bar()
+        self.handle_clear_horizontal()
+        self.handle_clear_vertical()
+        self.handle_block_in_air()
+
+    def handle_block_in_air(self):
+        if self.clear_horizontal:
+            print(self.blocks_cleared)
+            self.blocks_to_drop = horizontal_tree_blocks(self.blocks_cleared[0], self.grid)
+        elif self.clear_vertical:
+            print(self.blocks_cleared)
+            self.blocks_to_drop = vertical_tree_blocks(self.blocks_cleared[0], self.grid)
+
+    def handle_dropping_block(self):
+        for x, y in self.blocks_to_drop:
+            current_block = self.grid[x][y]
+            self.grid[x][y] = ITEM_BLANK
+            self.grid[x - 1][y] = current_block
+        self.blocks_to_drop = []
+
     def on_update(self, delta_time):
+        if not self.is_playing:
+            return False
+
         if self.elapsed_time >= self.game_speed:
             self.elapsed_time -= self.game_speed
+            if len(self.blocks_to_drop) == 0:
+                self.handle_movement()
+                # self.blocks_to_drop = self.get_blocks_in_air()
 
-            # MOVE THE BAR AUTOMATICLY
-            if self.elapsed_dropdown_time > self.dropdown_speed and self.direction is not DIRECTION_DOWN:
-                self.current_bar.move(DIRECTION_DOWN)
-                self.elapsed_dropdown_time = 0
-                self.has_move = True
+                has_collide_left_and_right_boundary = self.is_bar_collide_with_left_right_boundary(
+                )
+                has_collide_with_bottom_boundary = self.is_bar_collide_with_bottom_boundary()
+                has_collide_with_blocks = self.is_bar_collide_with_blocks()
+                from_horizontal = self.direction == DIRECTION_LEFT or self.direction == DIRECTION_RIGHT
 
-            # MOVE THE BAR ON INPUT
-            if self.direction is not DIRECTION_NEUTRAL and self.elapsed_key_time > self.key_speed:
-                self.current_bar.move(self.direction)
-                self.elapsed_key_time = 0
-                self.has_move = True
+                if any([
+                        has_collide_left_and_right_boundary, has_collide_with_bottom_boundary,
+                        has_collide_with_blocks
+                ]):
+                    self.handle_reverse_movement()
 
-            # ROTATE THE BAR
-            if self.rotation is not ROTATION_NEUTRAL:
-                self.current_bar.rotate(self.rotation)
-                self.rotation = ROTATION_NEUTRAL
-                self.has_rotate = True
+                if any([has_collide_with_bottom_boundary, has_collide_with_blocks
+                       ]) and not has_collide_left_and_right_boundary and not from_horizontal:
+                    self.handle_placing_bar()
+                    # print(self.grid)
 
-            has_collide_left_and_right_boundary = self.is_bar_collide_with_left_right_boundary()
-            has_collide_with_bottom_boundary = self.is_bar_collide_with_bottom_boundary()
-            has_collide_with_blocks = self.is_bar_collide_with_blocks()
-            from_horizontal = self.direction == DIRECTION_LEFT or self.direction == DIRECTION_RIGHT
+                self.has_move = False
+                self.has_rotate = False
+            else:
+                self.handle_dropping_block()
 
-            if any([
-                    has_collide_left_and_right_boundary, has_collide_with_bottom_boundary,
-                    has_collide_with_blocks
-            ]):
-                if self.has_move:
-                    self.current_bar.set_previous_position()
-                if self.has_rotate:
-                    self.current_bar.set_previous_rotation()
-
-            if any([has_collide_with_bottom_boundary, has_collide_with_blocks
-                   ]) and not has_collide_left_and_right_boundary and not from_horizontal:
-                for block, x, y in self.current_bar.blocks():
-                    self.grid[y][x] = block.type
-
-                self.next_bar()
-                self.handle_clear_horizontal()
-                self.handle_clear_vertical()
-
-            self.has_move = False
-            self.has_rotate = False
             self.update_grid()
 
         self.elapsed_time += delta_time
@@ -279,6 +335,8 @@ class Window(arcade.Window):
             self.rotation = ROTATION_LEFT
         elif key == arcade.key.E:
             self.rotation = ROTATION_RIGHT
+        elif key == arcade.key.P:
+            self.is_playing = not self.is_playing
 
         elif key == arcade.key.ESCAPE:
             self.close()
@@ -289,10 +347,8 @@ class Window(arcade.Window):
     def on_key_release(self, key, modifiers):
         if key == arcade.key.LEFT and self.direction == DIRECTION_LEFT:
             self.direction = DIRECTION_NEUTRAL
-
         if key == arcade.key.RIGHT and self.direction == DIRECTION_RIGHT:
             self.direction = DIRECTION_NEUTRAL
-
         if key == arcade.key.DOWN and self.direction == DIRECTION_DOWN:
             self.direction = DIRECTION_NEUTRAL
 

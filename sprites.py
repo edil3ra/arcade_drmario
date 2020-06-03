@@ -26,6 +26,8 @@ from config import (
     DIRECTION_RIGHT,
     ROTATION_LEFT,
     ROTATION_RIGHT,
+    VERTICAL_ORIENTATION,
+    HORIZONTAL_ORIENTATION
 )
 
 ball_textures = {
@@ -60,6 +62,7 @@ class SpriteBar():
         self.matrix = [[0, 0], [0, 0]]
         self.previous_matrix = [0, 0]
         self.previous_grid_position = [0, 0]
+        self.orientation = ''
         self.setup()
 
     def setup(self):
@@ -94,6 +97,8 @@ class SpriteBar():
             self.matrix = [list(r) for r in zip(*self.matrix[::-1])]
         elif rotation == ROTATION_RIGHT:
             self.matrix = [list(r) for r in reversed(list(zip(*self.matrix)))]
+
+        self.orientation = VERTICAL_ORIENTATION if self.orientation == HORIZONTAL_ORIENTATION else VERTICAL_ORIENTATION
         self.set_position()
 
     def set_previous_rotation(self):
@@ -103,6 +108,9 @@ class SpriteBar():
     def set_previous_position(self):
         self.grid_position = self.previous_grid_position
         self.set_position()
+
+    def is_vertical(self):
+        return self.matrix
 
     def draw(self):
         self.block1.draw()
