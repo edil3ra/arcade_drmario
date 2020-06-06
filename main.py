@@ -154,6 +154,18 @@ class Window(arcade.Window):
                     return True
         return False
 
+    def get_blocks_collide_with_bottom_boundary(self):
+        return [(x, y) for (x, y) in self.blocks_to_drop if y < 0]
+
+    def get_blocks_collide_with_blocks(self):
+        blocks = []
+        for (x, y) in self.blocks_to_drop:
+            if x < GRID_SIZE_H and y < GRID_SIZE_V:
+                if self.grid[y][x] is not ITEM_BLANK:
+                    blocks.append((x, y))
+        return blocks
+
+
     def is_virus(self, item):
         return item is ITEM_VIRUS_B or item is ITEM_VIRUS_R or item is ITEM_VIRUS_Y
 
@@ -219,13 +231,6 @@ class Window(arcade.Window):
                             self.grid[y + i][x] = ITEM_BLANK
 
 
-    def get_blocks_in_air(self):
-        # if len(self.blocks_cleared) > 0:
-        #     print(self.blocks_cleared)
-
-        self.blocks_cleared.clear()
-        return []
-
     def handle_movement(self):
         # MOVE THE BAR AUTOMATICLY
         if self.elapsed_dropdown_time > self.dropdown_speed and self.direction is not DIRECTION_DOWN:
@@ -245,7 +250,7 @@ class Window(arcade.Window):
             self.rotation = ROTATION_NEUTRAL
             self.has_rotate = True
 
-    def handle_reverse_movement(self):
+    def handle_reverse_bar(self):
         if self.has_move:
             self.current_bar.set_previous_position()
         if self.has_rotate:
@@ -262,10 +267,8 @@ class Window(arcade.Window):
 
     def handle_block_in_air(self):
         if self.clear_horizontal:
-            print(self.blocks_cleared)
             self.blocks_to_drop = horizontal_tree_blocks(self.blocks_cleared[0], self.grid)
         elif self.clear_vertical:
-            print(self.blocks_cleared)
             self.blocks_to_drop = vertical_tree_blocks(self.blocks_cleared[0], self.grid)
 
     def handle_dropping_block(self):
@@ -273,7 +276,7 @@ class Window(arcade.Window):
             current_block = self.grid[x][y]
             self.grid[x][y] = ITEM_BLANK
             self.grid[x - 1][y] = current_block
-        self.blocks_to_drop = []
+
 
     def on_update(self, delta_time):
         if not self.is_playing:
@@ -283,7 +286,6 @@ class Window(arcade.Window):
             self.elapsed_time -= self.game_speed
             if len(self.blocks_to_drop) == 0:
                 self.handle_movement()
-                # self.blocks_to_drop = self.get_blocks_in_air()
 
                 has_collide_left_and_right_boundary = self.is_bar_collide_with_left_right_boundary(
                 )
@@ -295,17 +297,26 @@ class Window(arcade.Window):
                         has_collide_left_and_right_boundary, has_collide_with_bottom_boundary,
                         has_collide_with_blocks
                 ]):
-                    self.handle_reverse_movement()
+                    self.handle_reverse_bar()
 
                 if any([has_collide_with_bottom_boundary, has_collide_with_blocks
                        ]) and not has_collide_left_and_right_boundary and not from_horizontal:
                     self.handle_placing_bar()
-                    # print(self.grid)
 
                 self.has_move = False
                 self.has_rotate = False
             else:
                 self.handle_dropping_block()
+                blocks_collide_with_bottom = self.get_blocks_collide_with_bottom_boundary()
+                blocks_collide_with_blocks = self.get_blocks_collide_with_blocks()
+                blocks_collide = set(blocks_collide_with_blocks) | set(blocks_collide_with_bottom)
+                
+                if len(blocks_collide) > 0:
+                    for block in blocks_collide:
+                        self.grid[block[0] - 1][block[1]] = self.grid[block[0]][self.grid[1]]
+                # remove collide blocks
+                for block in blocks_collide:
+                    self.blocks_to_drop.remove(block)
 
             self.update_grid()
 
